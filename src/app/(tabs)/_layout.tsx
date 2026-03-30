@@ -4,7 +4,9 @@ import { Platform } from "react-native";
 
 export default function TabsLayout() {
   return (
-    <NativeTabs>
+    <NativeTabs
+      tintColor="#ef5350"
+    >
       <NativeTabs.Trigger name="pokedex">
         <Icon
           {...(Platform.OS === "web"
