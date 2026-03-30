@@ -1,13 +1,15 @@
 import { Image } from "expo-image";
 import { useRouter, type Href } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -18,24 +20,56 @@ import {
 import type { PokemonListItem } from "../../types/pokemon";
 
 const ITEMS_PER_PAGE = 30;
+const TOTAL_TO_LOAD = 150;
 
 export default function Pokedex() {
   const router = useRouter();
-  const [items, setItems] = useState<PokemonListItem[]>([]);
+  const [allItems, setAllItems] = useState<PokemonListItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const inFlightRef = useRef(false);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Filter items based on debounced search query
+  const filteredItems = useMemo(() => {
+    if (!debouncedQuery.trim()) {
+      return allItems;
+    }
+    const query = debouncedQuery.toLowerCase();
+    return allItems.filter((item) =>
+      item.name.toLowerCase().includes(query)
+    );
+  }, [allItems, debouncedQuery]);
 
   const load = useCallback(async () => {
     setError(null);
-    const data = await fetchPokemonList(ITEMS_PER_PAGE, 0);
-    setItems(data.results);
-    setOffset(ITEMS_PER_PAGE);
-    setHasMore(data.hasMore);
+    try {
+      // Load all 150 Pokemon at once (5 batches of 30)
+      const batches = Math.ceil(TOTAL_TO_LOAD / ITEMS_PER_PAGE);
+      let allResults: PokemonListItem[] = [];
+
+      for (let i = 0; i < batches; i++) {
+        const offset = i * ITEMS_PER_PAGE;
+        const data = await fetchPokemonList(ITEMS_PER_PAGE, offset);
+        allResults = [...allResults, ...data.results];
+      }
+
+      // Only keep first 150
+      setAllItems(allResults.slice(0, TOTAL_TO_LOAD));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load Pokémon");
+    }
   }, []);
 
   useEffect(() => {
@@ -61,28 +95,11 @@ export default function Pokedex() {
     try {
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : "Failed to load Pokémon");
     } finally {
       setRefreshing(false);
     }
   }, [load]);
-
-  const loadMore = useCallback(async () => {
-    if (!hasMore || inFlightRef.current) return;
-    inFlightRef.current = true;
-    setLoadingMore(true);
-    try {
-      const data = await fetchPokemonList(ITEMS_PER_PAGE, offset);
-      setItems((prev) => [...prev, ...data.results]);
-      setOffset((prev) => prev + ITEMS_PER_PAGE);
-      setHasMore(data.hasMore);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load more");
-    } finally {
-      inFlightRef.current = false;
-      setLoadingMore(false);
-    }
-  }, [offset, hasMore]);
 
   const retry = useCallback(async () => {
     setLoading(true);
@@ -90,18 +107,17 @@ export default function Pokedex() {
     try {
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : "Failed to load Pokémon");
     } finally {
       setLoading(false);
     }
   }, [load]);
 
-  const retryLoadMore = useCallback(() => {
-    inFlightRef.current = false;
-    loadMore();
-  }, [loadMore]);
+  const onScroll = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
-  if (loading && items.length === 0) {
+  if (loading && allItems.length === 0) {
     return (
       <View style={[styles.centered, styles.screen]}>
         <ActivityIndicator size="large" color="#ef5350" />
@@ -109,7 +125,7 @@ export default function Pokedex() {
     );
   }
 
-  if (error && items.length === 0) {
+  if (error && allItems.length === 0) {
     return (
       <View style={[styles.centered, styles.screen]}>
         <Text style={styles.errorText}>{error}</Text>
@@ -123,37 +139,49 @@ export default function Pokedex() {
   return (
     <FlatList
       style={styles.screen}
-      data={items}
+      data={filteredItems}
       keyExtractor={(item) => item.name}
       contentContainerStyle={styles.listContent}
+      scrollEnabled={true}
+      keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={onScroll}
+      onMomentumScrollBegin={onScroll}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        error && items.length > 0 ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>{error}</Text>
-            <Pressable
-              style={styles.errorRetry}
-              onPress={retryLoadMore}
-            >
-              <Text style={styles.errorRetryLabel}>Retry</Text>
-            </Pressable>
+        <>
+          {/* Search Input */}
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search Pokémon..."
+              placeholderTextColor="#555"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
           </View>
-        ) : null
-      }
-      ListFooterComponent={
-        loadingMore ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="small" color="#ef5350" />
-          </View>
-        ) : null
+
+          {/* Error Banner */}
+          {error && allItems.length > 0 ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* No Results Message */}
+          {filteredItems.length === 0 && allItems.length > 0 ? (
+            <View style={styles.noResults}>
+              <Text style={styles.noResultsText}>No Pokémon found</Text>
+            </View>
+          ) : null}
+        </>
       }
       renderItem={({ item }) => {
-        const label =
-          item.name.charAt(0).toUpperCase() + item.name.slice(1);
+        const label = item.name.charAt(0).toUpperCase() + item.name.slice(1);
         const sprite = spriteUrlForPokemonUrl(item.url);
         return (
           <Pressable
@@ -263,5 +291,32 @@ const styles = StyleSheet.create({
     color: "#c62828",
     fontWeight: "600",
     fontSize: 12,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: "#0F0F0F",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1F1F1F",
+  },
+  searchInput: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 12,
+    color: "#fff",
+    fontSize: 16,
+    borderWidth: 1.5,
+    borderColor: "#333",
+  },
+  noResults: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 32,
+  },
+  noResultsText: {
+    color: "#888",
+    fontSize: 16,
   },
 });
