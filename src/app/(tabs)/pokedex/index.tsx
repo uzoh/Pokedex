@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useRouter, type Href } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import {
 import {
   fetchPokemonList,
   spriteUrlForPokemonUrl,
+  type PokemonListResult,
 } from "../../lib/pokeapi";
 import type { PokemonListItem } from "../../types/pokemon";
 
@@ -28,13 +29,14 @@ export default function Pokedex() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const inFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
     const data = await fetchPokemonList(ITEMS_PER_PAGE, 0);
-    setItems(data);
+    setItems(data.results);
     setOffset(ITEMS_PER_PAGE);
-    setHasMore(data.length === ITEMS_PER_PAGE);
+    setHasMore(data.hasMore);
   }, []);
 
   useEffect(() => {
@@ -67,19 +69,21 @@ export default function Pokedex() {
   }, [load]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMore || inFlightRef.current) return;
+    inFlightRef.current = true;
     setLoadingMore(true);
     try {
       const data = await fetchPokemonList(ITEMS_PER_PAGE, offset);
-      setItems((prev) => [...prev, ...data]);
+      setItems((prev) => [...prev, ...data.results]);
       setOffset((prev) => prev + ITEMS_PER_PAGE);
-      setHasMore(data.length === ITEMS_PER_PAGE);
+      setHasMore(data.hasMore);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load more");
     } finally {
+      inFlightRef.current = false;
       setLoadingMore(false);
     }
-  }, [offset, hasMore, loadingMore]);
+  }, [offset, hasMore]);
 
   const retry = useCallback(async () => {
     setLoading(true);
@@ -92,6 +96,11 @@ export default function Pokedex() {
       setLoading(false);
     }
   }, [load]);
+
+  const retryLoadMore = useCallback(() => {
+    inFlightRef.current = false;
+    loadMore();
+  }, [loadMore]);
 
   if (loading && items.length === 0) {
     return (
@@ -123,6 +132,19 @@ export default function Pokedex() {
       }
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
+      ListHeaderComponent={
+        error && items.length > 0 ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{error}</Text>
+            <Pressable
+              style={styles.errorRetry}
+              onPress={retryLoadMore}
+            >
+              <Text style={styles.errorRetryLabel}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null
+      }
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.centered}>
@@ -213,5 +235,34 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     color: "#fff",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    backgroundColor: "#c62828",
+    borderRadius: 8,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 14,
+    marginRight: 12,
+  },
+  errorRetry: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#fff",
+    borderRadius: 4,
+  },
+  errorRetryLabel: {
+    color: "#c62828",
+    fontWeight: "600",
+    fontSize: 12,
   },
 });

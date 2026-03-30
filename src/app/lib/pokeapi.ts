@@ -3,6 +3,12 @@ import type { PokemonListItem, PokemonListResponse } from "../types/pokemon";
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 const SPRITES_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
 
+export type PokemonListResult = {
+  results: PokemonListItem[];
+  count: number;
+  hasMore: boolean;
+};
+
 export function pokemonIdFromUrl(url: string): number | null {
   const parts = url.split("/").filter(Boolean);
   const id = Number(parts[parts.length - 1]);
@@ -12,7 +18,7 @@ export function pokemonIdFromUrl(url: string): number | null {
 export async function fetchPokemonList(
   limit = 151,
   offset = 0
-): Promise<PokemonListItem[]> {
+): Promise<PokemonListResult> {
   const res = await fetch(
     `${POKEAPI_BASE}/pokemon?limit=${limit}&offset=${offset}`
   );
@@ -20,7 +26,11 @@ export async function fetchPokemonList(
     throw new Error(`PokéAPI request failed (${res.status})`);
   }
   const data = (await res.json()) as PokemonListResponse;
-  return data.results;
+  return {
+    results: data.results,
+    count: data.count,
+    hasMore: data.next !== null,
+  };
 }
 
 export function spriteUrlForPokemonUrl(url: string): string | null {
