@@ -15,37 +15,7 @@ import {
 import { STAT_BAR_COLORS, STAT_LABELS, STAT_THRESHOLDS, TYPE_COLORS } from "../../lib/constants";
 import { fetchPokemonDetails } from "../../lib/pokeapi";
 import { BORDER_RADIUS, COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING } from "../../lib/theme";
-
-type PokemonDetail = {
-  id: number;
-  name: string;
-  sprites: {
-    other: {
-      "official-artwork": {
-        front_default: string;
-      };
-    };
-  };
-  types: Array<{
-    type: {
-      name: string;
-    };
-  }>;
-  stats: Array<{
-    base_stat: number;
-    stat: {
-      name: string;
-    };
-  }>;
-  height: number;
-  weight: number;
-  abilities: Array<{
-    ability: {
-      name: string;
-    };
-  }>;
-  base_experience: number;
-};
+import type { PokemonDetail } from "../../types/pokemon";
 
 export default function PokemonDetails() {
   const { pokemon } = useLocalSearchParams<{ pokemon?: string }>();
@@ -57,6 +27,11 @@ export default function PokemonDetails() {
   useEffect(() => {
     let cancelled = false;
 
+    // Reset UI state when pokemon changes
+    setLoading(true);
+    setError(null);
+    setDetails(null);
+
     const load = async () => {
       if (!pokemon) {
         setError("No Pokémon selected");
@@ -65,10 +40,9 @@ export default function PokemonDetails() {
       }
 
       try {
-        setError(null);
         const data = await fetchPokemonDetails(pokemon);
         if (!cancelled) {
-          setDetails(data as PokemonDetail);
+          setDetails(data);
         }
       } catch (e: unknown) {
         if (!cancelled) {
