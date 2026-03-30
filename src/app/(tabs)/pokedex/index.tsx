@@ -13,8 +13,7 @@ import {
 
 import {
   fetchPokemonList,
-  spriteUrlForPokemonUrl,
-  type PokemonListResult,
+  spriteUrlForPokemonUrl
 } from "../../lib/pokeapi";
 import type { PokemonListItem } from "../../types/pokemon";
 
