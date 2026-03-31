@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { useRouter, type Href } from "expo-router";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useRouter, type Href, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,7 @@ import {
   fetchPokemonList,
   spriteUrlForPokemonUrl
 } from "../../lib/pokeapi";
+import { useFavorites } from "../../hooks/useFavorites";
 import type { PokemonListItem } from "../../types/pokemon";
 
 const ITEMS_PER_PAGE = 30;
@@ -24,13 +25,23 @@ const TOTAL_TO_LOAD = 150;
 
 export default function Pokedex() {
   const router = useRouter();
+  const { isFavorite, reloadFavorites } = useFavorites();
   const [allItems, setAllItems] = useState<PokemonListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const inFlightRef = useRef(false);
+
+  // Refresh favorites when returning to this page
+  useFocusEffect(
+    useCallback(() => {
+      reloadFavorites();
+      setRefreshKey((prev) => prev + 1);
+    }, [reloadFavorites])
+  );
 
   // Debounce search query
   useEffect(() => {
@@ -183,9 +194,10 @@ export default function Pokedex() {
       renderItem={({ item }) => {
         const label = item.name.charAt(0).toUpperCase() + item.name.slice(1);
         const sprite = spriteUrlForPokemonUrl(item.url);
+        const favorited = isFavorite(item.name);
         return (
           <Pressable
-            style={styles.row}
+            style={[styles.row, favorited && styles.rowFavorited]}
             onPress={() =>
               router.push({
                 pathname: "/pokedex/[pokemon]",
@@ -193,16 +205,23 @@ export default function Pokedex() {
               } as unknown as Href)
             }
           >
-            {sprite ? (
-              <Image
-                source={{ uri: sprite }}
-                style={styles.sprite}
-                contentFit="contain"
-                transition={150}
-              />
-            ) : (
-              <View style={styles.spritePlaceholder} />
-            )}
+            <View style={styles.spriteContainer}>
+              {sprite ? (
+                <Image
+                  source={{ uri: sprite }}
+                  style={styles.sprite}
+                  contentFit="contain"
+                  transition={150}
+                />
+              ) : (
+                <View style={styles.spritePlaceholder} />
+              )}
+              {favorited && (
+                <View style={styles.favoriteStarBadge}>
+                  <Text style={styles.favoriteStarText}>★</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.name}>{label}</Text>
           </Pressable>
         );
@@ -247,17 +266,40 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#333",
   },
+  rowFavorited: {
+    backgroundColor: "#1a1a1a",
+  },
+  spriteContainer: {
+    position: "relative",
+    marginRight: 12,
+  },
   sprite: {
     width: 48,
     height: 48,
-    marginRight: 12,
   },
   spritePlaceholder: {
     width: 48,
     height: 48,
-    marginRight: 12,
     borderRadius: 8,
     backgroundColor: "#2a2a2a",
+  },
+  favoriteStarBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ef5350",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#121212",
+  },
+  favoriteStarText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
   name: {
     fontSize: 16,
