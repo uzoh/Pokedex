@@ -1,17 +1,18 @@
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useFavorites } from "../../hooks/useFavorites";
 import { STAT_BAR_COLORS, STAT_LABELS, STAT_THRESHOLDS, TYPE_COLORS } from "../../lib/constants";
 import { fetchPokemonDetails } from "../../lib/pokeapi";
 import { BORDER_RADIUS, COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING } from "../../lib/theme";
@@ -23,6 +24,21 @@ export default function PokemonDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
+
+  const isCurrentFavorite = useMemo(
+    () => details ? isFavorite(details.name) : false,
+    [details, isFavorite]
+  );
+
+  const handleToggleFavorite = () => {
+    if (details) {
+      toggleFavorite({
+        name: details.name,
+        url: `https://pokeapi.co/api/v2/pokemon/${details.id}/`,
+      });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +120,11 @@ export default function PokemonDetails() {
         <Text style={styles.pokemonName}>
           {details.name.charAt(0).toUpperCase() + details.name.slice(1)}
         </Text>
+        <Pressable style={styles.favoriteButton} onPress={handleToggleFavorite}>
+          <Text style={styles.favoriteButtonText}>
+            {isCurrentFavorite ? "★" : "☆"}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Types and Quick Info */}
@@ -438,6 +459,24 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.extrabold,
     color: COLORS.text.primary,
     letterSpacing: -0.5,
+  },
+  favoriteButton: {
+    marginTop: SPACING.lg,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.accent,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  favoriteButtonText: {
+    fontSize: FONT_SIZES["3xl"],
+    color: "#fff",
   },
 
   // Quick Info
