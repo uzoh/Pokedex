@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useRouter, type Href, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,11 +13,11 @@ import {
   View,
 } from "react-native";
 
+import { useFavorites } from "../../hooks/useFavorites";
 import {
   fetchPokemonList,
   spriteUrlForPokemonUrl
 } from "../../lib/pokeapi";
-import { useFavorites } from "../../hooks/useFavorites";
 import type { PokemonListItem } from "../../types/pokemon";
 
 const ITEMS_PER_PAGE = 30;

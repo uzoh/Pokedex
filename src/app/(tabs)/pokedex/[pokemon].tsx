@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -12,10 +12,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useFavorites } from "../../hooks/useFavorites";
 import { STAT_BAR_COLORS, STAT_LABELS, STAT_THRESHOLDS, TYPE_COLORS } from "../../lib/constants";
 import { fetchPokemonDetails } from "../../lib/pokeapi";
 import { BORDER_RADIUS, COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING } from "../../lib/theme";
-import { useFavorites } from "../../hooks/useFavorites";
 import type { PokemonDetail } from "../../types/pokemon";
 
 export default function PokemonDetails() {

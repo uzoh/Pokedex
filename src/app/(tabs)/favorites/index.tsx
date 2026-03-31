@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { useRouter, type Href, useFocusEffect } from "expo-router";
-import { useCallback, useState, useEffect } from "react";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -9,10 +9,10 @@ import {
   View,
 } from "react-native";
 
+import { useFavorites } from "../../hooks/useFavorites";
 import {
   spriteUrlForPokemonUrl
 } from "../../lib/pokeapi";
-import { useFavorites } from "../../hooks/useFavorites";
 import type { PokemonListItem } from "../../types/pokemon";
 
 export default function Favorites() {

@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useCallback, useEffect, useState } from "react";
 import type { PokemonListItem } from "../types/pokemon";
 
 const FAVORITES_KEY = "pokedex_favorites";
